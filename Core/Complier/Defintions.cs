@@ -8,15 +8,39 @@ namespace SharpPtr.System.Complier
 {
     abstract class AstNode { }
 
+    // definition for methods
+    class MethodParameter
+    {
+        public string Name;
+        public string Type;
+
+        public MethodParameter(string name, string type = null)
+        {
+            Name = name;
+            Type = type;
+        }
+
+        public override string ToString() => Type != null ? $"{Type} {Name}" : Name;
+    }
+
     class MethodCall : AstNode
     {
         public string Obj, Method;
-        public MethodCall(string o, string m)
+        public List<string> Arguments; // argument values passed to method
+
+        public MethodCall(string o, string m, List<string> args = null)
         {
             Obj = o;
             Method = m;
+            Arguments = args ?? new List<string>();
         }
-        public override string ToString() => $"{Obj}->{Method}()";
+
+        public override string ToString()
+        {
+            if (Arguments.Count > 0)
+                return $"{Obj}->{Method}({string.Join(", ", Arguments)})";
+            return $"{Obj}->{Method}()";
+        }
     }
 
     class SafeCast : AstNode
@@ -64,16 +88,26 @@ namespace SharpPtr.System.Complier
         public override string ToString() => $"main {{ {Body.Count} items }}";
     }
 
+    // Enhanced MethodDef with parameters
     class MethodDef : AstNode
     {
         public string Name;
+        public List<MethodParameter> Parameters;
         public List<AstNode> Body;
 
-        public MethodDef(string name ,List<AstNode> body)
+        public MethodDef(string name, List<MethodParameter> parameters, List<AstNode> body)
         {
             Name = name;
+            Parameters = parameters ?? new List<MethodParameter>();
             Body = body;
         }
-        public override string ToString() => $"method {{ {Body.Count} items }}";
+
+        public override string ToString()
+        {
+            var paramStr = Parameters.Count > 0
+                ? $"({string.Join(", ", Parameters)})"
+                : "()";
+            return $"method {Name}{paramStr} {{ {Body.Count} items }}";
+        }
     }
 }

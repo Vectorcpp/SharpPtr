@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Metadata;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -182,10 +183,12 @@ namespace SharpPtr.System.Complier
 
         public void Add(MethodCall mc)
         {
-            if (Calls.ContainsKey(mc.Obj))
-                throw new Exception($"'{mc.Obj}' already got a method");
+            string key = $"{mc.Obj}.{mc.Method}";
 
-            Calls[mc.Obj] = mc;
+            if (Calls.ContainsKey(key))
+                throw new Exception($"'{key}' already exists");
+
+            Calls[key] = mc;
             PtrNode.AddMethod(mc.Obj, mc.Method, "parsed method call");
         }
 
@@ -312,11 +315,19 @@ namespace SharpPtr.System.Complier
                 throw new Exception("Expected indentation or '::' after main:");
             }
 
-            // method name:
+            // method name: or method name(params):
             if (look(TokenType.Funcs))
             {
                 grab(TokenType.Funcs);
                 string funcName = grab(TokenType.Identifier).Lexeme;
+
+                // Parse parameters if present
+                List<MethodParameter> parameters = new List<MethodParameter>();
+                if (look(TokenType.LParen))
+                {
+                    parameters = ParseParameters();
+                }
+
                 grab(TokenType.Colon);
 
                 if (look(TokenType.Newline)) grab(TokenType.Newline);
@@ -328,6 +339,12 @@ namespace SharpPtr.System.Complier
                     grab(TokenType.Indent);
                     inFunction = true;
                     localVars.Clear();
+
+                    // Add parameters to local scope
+                    foreach (var param in parameters)
+                    {
+                        localVars.Add(param.Name);
+                    }
 
                     while (!look(TokenType.DoubleColon) && !look(TokenType.EOF))
                     {
@@ -349,21 +366,29 @@ namespace SharpPtr.System.Complier
                 }
                 else throw new Exception("Expected indentation or '::'");
 
-                var method = new MethodDef(funcName, body);
+                var method = new MethodDef(funcName, parameters, body);
                 PtrNode.Register(funcName, PtrKind.Method, method, "user-defined function");
                 return method;
             }
 
-            // obj->method()
+            // obj->method() or obj->method(args)
             if (look(TokenType.Identifier) && look(TokenType.Arrow, 1))
             {
                 string obj = grab(TokenType.Identifier).Lexeme;
                 grab(TokenType.Arrow);
                 string method = grab(TokenType.Identifier).Lexeme;
-                grab(TokenType.LParen);
-                grab(TokenType.RParen);
 
-                var m = new MethodCall(obj, method);
+                List<string> arguments = new List<string>();
+                if (look(TokenType.LParen))
+                {
+                    arguments = ParseArguments();
+                }
+                else
+                {
+                    throw new Exception("Expected '(' after method name");
+                }
+
+                var m = new MethodCall(obj, method, arguments);
                 Registry.Add(m);
                 return m;
             }
@@ -403,6 +428,84 @@ namespace SharpPtr.System.Complier
 
             throw new Exception("this syntax is broken");
         }
+
+        // Parse method parameters: (type name, type name, ...) or (name, name, ...)
+        private List<MethodParameter> ParseParameters()
+        {
+            var parameters = new List<MethodParameter>();
+
+            grab(TokenType.LParen);
+
+            while (!look(TokenType.RParen) && !look(TokenType.EOF))
+            {
+                if (look(TokenType.Identifier) && look(TokenType.Identifier, 1))
+                {
+                    // Typed parameter: type name
+                    string type = grab(TokenType.Identifier).Lexeme;
+                    string name = grab(TokenType.Identifier).Lexeme;
+                    parameters.Add(new MethodParameter(name, type));
+                }
+                else if (look(TokenType.Identifier))
+                {
+                    // Untyped parameter: name
+                    string name = grab(TokenType.Identifier).Lexeme;
+                    parameters.Add(new MethodParameter(name));
+                }
+
+                if (look(TokenType.Comma))
+                {
+                    grab(TokenType.Comma);
+                }
+                else if (!look(TokenType.RParen))
+                {
+                    throw new Exception("Expected ',' or ')' in parameter list");
+                }
+            }
+
+            grab(TokenType.RParen);
+            return parameters;
+        }
+
+        // parse method call arguments: (value, value, ...)
+        private List<string> ParseArguments()
+        {
+            var arguments = new List<string>();
+
+            grab(TokenType.LParen);
+
+            while (!look(TokenType.RParen) && !look(TokenType.EOF))
+            {
+                if (look(TokenType.Identifier))
+                {
+                    arguments.Add(grab(TokenType.Identifier).Lexeme);
+                }
+                else if (look(TokenType.Number))
+                {
+                    arguments.Add(grab(TokenType.Number).Lexeme);
+                }
+                else if (look(TokenType.String))  // ADD THIS CASE
+                {
+                    arguments.Add(grab(TokenType.String).Lexeme);
+                }
+                else
+                {
+                    throw new Exception("Expected argument value");
+                }
+
+                if (look(TokenType.Comma))
+                {
+                    grab(TokenType.Comma);
+                }
+                else if (!look(TokenType.RParen))
+                {
+                    throw new Exception("Expected ',' or ')' in argument list");
+                }
+            }
+
+            grab(TokenType.RParen);
+            return arguments;
+        }
+
 
         public List<AstNode> ParseAll()
         {

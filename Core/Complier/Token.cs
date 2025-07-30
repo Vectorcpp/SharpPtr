@@ -6,19 +6,22 @@ using System.Threading.Tasks;
 
 namespace SharpPtr.System.Complier
 {
+    // Updated TokenType enum - add to Token.cs
     enum TokenType
     {
         Identifier,
         Number,
-        Arrow, // ->
-        CastSafe, // -?
+        String,        // For string literals like "Alice"
+        Arrow,         // ->
+        CastSafe,      // -?
         LParen, RParen,
         LBrace, RBrace, // { }
-        Dot, // .
-        Assign, // =
+        Dot,           // .
+        Assign,        // =
+        Comma,         // ,
         Colon, DoubleColon, // :, ::
-        Class, // class keyword
-        Main, // main keyword
+        Class,         // class keyword
+        Main,          // main keyword
         Indent, Dedent, // indentation tokens
         Newline,
         Funcs,

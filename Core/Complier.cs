@@ -72,6 +72,7 @@ namespace SharpPtr.Core
                     continue;
                 }
 
+
                 if (char.IsWhiteSpace(c))
                 {
                     next();
@@ -133,6 +134,42 @@ namespace SharpPtr.Core
                     toks.Add(new Token(TokenType.Colon, ":", line));
                     next();
                 }
+                else if (c == '"')
+                {
+                    next(); // consume opening quote
+                    string str = "";
+
+                    while (!done() && peek() != '"')
+                    {
+                        if (peek() == '\\' && i + 1 < src.Length) // handle escape sequences
+                        {
+                            next(); // consume backslash
+                            char escaped = peek();
+                            switch (escaped)
+                            {
+                                case 'n': str += '\n'; break;
+                                case 't': str += '\t'; break;
+                                case 'r': str += '\r'; break;
+                                case '\\': str += '\\'; break;
+                                case '"': str += '"'; break;
+                                default: str += escaped; break;
+                            }
+                            next();
+                        }
+                        else
+                        {
+                            str += peek();
+                            next();
+                        }
+                    }
+
+                    if (done())
+                        throw new Exception($"Unterminated string literal on line {line}");
+
+                    next(); // consume closing quote
+                    toks.Add(new Token(TokenType.String, str, line));
+                }
+                else if (c == ',') { toks.Add(new Token(TokenType.Comma, ",", line)); next(); }
 
 
                 else throw new Exception($"wtf is '{c}' on line {line}");
